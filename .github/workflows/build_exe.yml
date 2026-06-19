@@ -45,10 +45,19 @@ jobs:
           --hidden-import=openpyxl.cell._writer `
           main.py
 
-    - name: Vytvoření GitHub Release a nahrání EXE
+    - name: Instalace Inno Setup
+      run: choco install innosetup -y --no-progress
+
+    - name: Sestavení instalátoru (Inno Setup)
+      run: |
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=${{ github.ref_name }} installer\PIES.iss
+
+    - name: Vytvoření GitHub Release a nahrání instalátoru
       uses: softprops/action-gh-release@v2
       with:
-        files: dist/PIES_System.exe
+        files: |
+          installer/Output/PIES_Setup_${{ github.ref_name }}.exe
+          dist/PIES_System.exe
         name: Release ${{ github.ref_name }}
         tag_name: ${{ github.ref }}
         draft: false

@@ -9,7 +9,7 @@ from core.style import THEME, apply_ttk_styles
 from core.updater import check_for_updates
 
 SYSTEM_NAME = "PIES"
-CURRENT_VERSION = "v13.6"
+CURRENT_VERSION = "v13.8"
 CONFIG_FILE = 'config.ini'
 
 class PIES_Main(tk.Tk):
