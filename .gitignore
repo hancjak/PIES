@@ -1,0 +1,8 @@
+﻿config.ini
+.claude/
+__pycache__/
+*.pyc
+*.exe
+build/
+dist/
+*.csv

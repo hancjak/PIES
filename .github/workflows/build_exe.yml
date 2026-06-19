@@ -1,0 +1,55 @@
+name: Build and Release PPS Editor
+
+on:
+  push:
+    tags:
+      - 'v*' # Spustí se, když vytvoříš tag začínající na 'v' (např. v1.0, v10.1)
+
+permissions:
+  contents: write # Povolení k vytváření Releases
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout kódu
+      uses: actions/checkout@v4
+
+    - name: Nastavení Pythonu 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Instalace knihoven
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas pyinstaller requests openpyxl
+
+    - name: Sestavení EXE (PyInstaller)
+      run: |
+        # Balíme main.py a přidáváme složky core a modules
+        # --add-data pracuje ve formátu "zdroj;cíl"
+        pyinstaller --noconsole --onefile --name "PIES_System" `
+          --add-data "core;core" `
+          --add-data "modules;modules" `
+          --hidden-import=modules.editor `
+          --hidden-import=modules.diff_tool `
+          --hidden-import=core.analysis `
+          --hidden-import=core.style `
+          --hidden-import=core.utils `
+          --hidden-import=core.printer `
+          --hidden-import=openpyxl `
+          --hidden-import=openpyxl.cell._writer `
+          main.py
+
+    - name: Vytvoření GitHub Release a nahrání EXE
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/PIES_System.exe
+        name: Release ${{ github.ref_name }}
+        tag_name: ${{ github.ref }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

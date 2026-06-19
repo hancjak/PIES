@@ -1,0 +1,7 @@
+[PATHS]
+; Cesta ke sdílené složce se seznamem vodičů (seznam_vodicu.csv).
+; Necho prázdné = nastaví se v aplikaci přes [ Změnit cestu ] na uvítací obrazovce.
+server_path =
+
+; Poslední použitá složka pro dialogy (vyplní si aplikace sama).
+last_path =
