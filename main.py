@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, ttk
-import os, sys, pandas as pd, configparser, datetime
+import os, sys, pandas as pd, configparser, datetime, webbrowser
 
 from modules.editor import KabelovyEditor
 from modules.diff_tool import DiffApp
@@ -9,7 +9,7 @@ from core.style import THEME, apply_ttk_styles
 from core.updater import check_for_updates
 
 SYSTEM_NAME = "PIES"
-CURRENT_VERSION = "v13.10"
+CURRENT_VERSION = "v13.11"
 CONFIG_FILE = 'config.ini'
 
 class PIES_Main(tk.Tk):
@@ -153,8 +153,10 @@ class PIES_Main(tk.Tk):
 
         tk.Label(outer, text="PIES", font=("Consolas", 72, "bold"),
                  fg=THEME["accent"], bg=THEME["bg"]).pack(pady=(0, 4))
-        tk.Label(outer, text=CURRENT_VERSION, font=("Consolas", 13),
-                 fg=THEME["fg_dim"], bg=THEME["bg"]).pack(pady=(0, 36))
+        ver = tk.Label(outer, text=CURRENT_VERSION, font=("Consolas", 13),
+                       fg=THEME["fg_dim"], bg=THEME["bg"], cursor="hand2")
+        ver.pack(pady=(0, 36))
+        ver.bind("<Button-1>", lambda e: self.show_about())
 
         btn_row = tk.Frame(outer, bg=THEME["bg"])
         btn_row.pack(pady=(0, 30))
@@ -258,7 +260,44 @@ class PIES_Main(tk.Tk):
         t.add_separator()
         t.add_command(label="Změnit cestu serveru", command=self.change_server_path)
         m.add_cascade(label="Tools", menu=t)
+
+        h = tk.Menu(m, tearoff=0, bg=THEME["bg"], fg=THEME["fg"])
+        h.add_command(label="O programu / Credits", command=self.show_about)
+        m.add_cascade(label="Help", menu=h)
         self.config(menu=m)
+
+    def show_about(self):
+        win = tk.Toplevel(self)
+        win.title("O programu")
+        win.configure(bg=THEME["bg"])
+        win.resizable(False, False)
+        win.transient(self); win.grab_set()
+
+        tk.Label(win, text="PIES", font=("Consolas", 48, "bold"),
+                 fg=THEME["accent"], bg=THEME["bg"]).pack(padx=48, pady=(26, 0))
+        tk.Label(win, text="Editor kabelových popisků", font=("Consolas", 10),
+                 fg=THEME["fg"], bg=THEME["bg"]).pack()
+        tk.Label(win, text=CURRENT_VERSION, font=("Consolas", 13, "bold"),
+                 fg=THEME["fg_dim"], bg=THEME["bg"]).pack(pady=(6, 20))
+
+        info = ("Autor:   Jakub Hanc\n"
+                "Účel:    editace popisků kabelů z EPLAN exportů\n"
+                "Stack:   Python · tkinter · pandas\n"
+                "Balení:  PyInstaller + Inno Setup")
+        tk.Label(win, text=info, font=("Consolas", 9), fg=THEME["fg"],
+                 bg=THEME["bg"], justify=tk.LEFT).pack(padx=48)
+
+        link = tk.Label(win, text="github.com/hancjak/PIES", cursor="hand2",
+                        font=("Consolas", 9, "underline"), fg=THEME["accent"], bg=THEME["bg"])
+        link.pack(pady=(14, 4))
+        link.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/hancjak/PIES"))
+
+        tk.Label(win, text="Vyrobeno s pomocí Claude (Anthropic)", font=("Consolas", 8),
+                 fg=THEME["fg_dim"], bg=THEME["bg"]).pack(pady=(6, 4))
+
+        tk.Button(win, text="[ ZAVŘÍT ]", command=win.destroy, bg=THEME["dark_grey"],
+                  fg=THEME["accent"], font=("Consolas", 11, "bold"), relief=tk.FLAT,
+                  cursor="hand2", padx=16, pady=6).pack(pady=(14, 26))
 
     def action_new_project(self):
         if not self.ensure_sklad_path(): return
