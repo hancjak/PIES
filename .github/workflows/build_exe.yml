@@ -39,6 +39,8 @@ jobs:
           --hidden-import=core.style `
           --hidden-import=core.utils `
           --hidden-import=core.printer `
+          --hidden-import=core.updater `
+          --hidden-import=requests `
           --hidden-import=openpyxl `
           --hidden-import=openpyxl.cell._writer `
           main.py

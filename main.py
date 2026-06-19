@@ -6,6 +6,7 @@ from modules.editor import KabelovyEditor
 from modules.diff_tool import DiffApp
 from core.analysis import analyze_raw_data
 from core.style import THEME, apply_ttk_styles
+from core.updater import check_for_updates
 
 SYSTEM_NAME = "PIES"
 CURRENT_VERSION = "v13.6"
@@ -39,6 +40,9 @@ class PIES_Main(tk.Tk):
         self.bind("<Control-f>", lambda e: self.action_search())
         self.bind("<Control-n>", lambda e: self.action_add_row())
         self.bind("<Control-p>", lambda e: self.action_print())
+
+        # Kontrola aktualizací (jen v .exe, na pozadí, neblokuje start)
+        self.after(1500, lambda: check_for_updates(CURRENT_VERSION, self, self.log))
 
     def get_server_path(self):
         if os.path.exists(CONFIG_FILE):
