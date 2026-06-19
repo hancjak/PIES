@@ -9,7 +9,7 @@ from core.style import THEME, apply_ttk_styles
 from core.updater import check_for_updates
 
 SYSTEM_NAME = "PIES"
-CURRENT_VERSION = "v13.8"
+CURRENT_VERSION = "v13.9"
 CONFIG_FILE = 'config.ini'
 
 class PIES_Main(tk.Tk):
@@ -28,6 +28,7 @@ class PIES_Main(tk.Tk):
         self.config_parser = configparser.ConfigParser()
         self.server_path = self.get_server_path()
         self.server_sklad = os.path.join(self.server_path, "seznam_vodicu.csv") if self.server_path else ""
+        self._last_dir = None  # zapamatovaná složka pro file dialogy v rámci sezení
         
         apply_ttk_styles(ttk.Style())
         self.create_menu()
@@ -43,6 +44,18 @@ class PIES_Main(tk.Tk):
 
         # Kontrola aktualizací (jen v .exe, na pozadí, neblokuje start)
         self.after(1500, lambda: check_for_updates(CURRENT_VERSION, self, self.log))
+
+    def report_callback_exception(self, exc, val, tb):
+        """Záchytná síť: jakákoliv neodchycená chyba v callbacku se zaloguje
+        a uživateli se ukáže místo tichého pádu (černé obrazovky)."""
+        import traceback
+        msg = "".join(traceback.format_exception_only(exc, val)).strip()
+        try: self.log(f"CHYBA: {msg}")
+        except Exception: pass
+        try:
+            messagebox.showerror("PIES – chyba", f"Nastala neočekávaná chyba:\n\n{msg}")
+            self.show_error_screen(msg)
+        except Exception: pass
 
     def get_server_path(self):
         if os.path.exists(CONFIG_FILE):
@@ -178,6 +191,58 @@ class PIES_Main(tk.Tk):
         self.current_module = None
         for w in self.workspace.winfo_children(): w.destroy()
 
+    # ---------- File dialogy s pamětí poslední složky ----------
+    def _start_dir(self):
+        return self._last_dir or self.get_initial_dir()
+
+    def _remember(self, paths):
+        if not paths: return
+        first = paths[0] if isinstance(paths, (list, tuple)) else paths
+        d = first if os.path.isdir(first) else os.path.dirname(first)
+        if d: self._last_dir = d
+
+    def _ask_open_files(self, title):
+        res = filedialog.askopenfilenames(title=title, initialdir=self._start_dir(),
+                                          filetypes=[("CSV", "*.csv")])
+        self._remember(res); return res
+
+    def _ask_open_file(self, title):
+        res = filedialog.askopenfilename(title=title, initialdir=self._start_dir(),
+                                         filetypes=[("CSV", "*.csv")])
+        self._remember(res); return res
+
+    def _ask_save_file(self, title):
+        res = filedialog.asksaveasfilename(title=title, initialdir=self._start_dir(),
+                                           defaultextension=".csv", filetypes=[("CSV", "*.csv")])
+        self._remember(res); return res
+
+    # ---------- Stavové obrazovky ----------
+    def show_busy(self, message):
+        """Zobrazí 'PRACUJI…' a hned překreslí, aby to bylo vidět i během blokujícího zpracování."""
+        self.clear_workspace()
+        box = tk.Frame(self.workspace, bg=THEME["bg"])
+        box.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        tk.Label(box, text="[ PRACUJI… ]", font=("Consolas", 28, "bold"),
+                 fg=THEME["accent"], bg=THEME["bg"]).pack(pady=(0, 10))
+        tk.Label(box, text=message, font=("Consolas", 12),
+                 fg=THEME["fg"], bg=THEME["bg"]).pack()
+        self.update_idletasks()
+
+    def show_error_screen(self, message):
+        """Chybová obrazovka s tlačítkem návratu na HOME."""
+        self.clear_workspace()
+        box = tk.Frame(self.workspace, bg=THEME["bg"])
+        box.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        tk.Label(box, text="[ ! ]  NĚCO SE POKAZILO", font=("Consolas", 26, "bold"),
+                 fg="#FF3333", bg=THEME["bg"]).pack(pady=(0, 14))
+        tk.Label(box, text=message, font=("Consolas", 11), fg=THEME["fg"], bg=THEME["bg"],
+                 justify=tk.LEFT, wraplength=820).pack(pady=(0, 8))
+        tk.Label(box, text="Detail najdeš v logu dole.", font=("Consolas", 9),
+                 fg=THEME["fg_dim"], bg=THEME["bg"]).pack(pady=(0, 24))
+        tk.Button(box, text="[ RESTART / HOME ]", command=self.show_welcome_screen,
+                  bg=THEME["dark_grey"], fg=THEME["accent"], font=("Consolas", 13, "bold"),
+                  relief=tk.FLAT, cursor="hand2", padx=20, pady=10).pack()
+
     def create_menu(self):
         m = tk.Menu(self, bg=THEME["bg"], fg=THEME["fg"])
         f = tk.Menu(m, tearoff=0, bg=THEME["bg"], fg=THEME["fg"])
@@ -197,27 +262,50 @@ class PIES_Main(tk.Tk):
 
     def action_new_project(self):
         if not self.ensure_sklad_path(): return
-        idir = self.get_initial_dir()
-        fc = filedialog.askopenfilenames(title="LINES", initialdir=idir, filetypes=[("CSV", "*.csv")])
-        fs = filedialog.askopenfilenames(title="SIGNALS", initialdir=idir, filetypes=[("CSV", "*.csv")])
-        if fc and fs:
-            p = filedialog.asksaveasfilename(title="SAVE PROJECT", initialdir=idir, filetypes=[("CSV", "*.csv")])
-            if p:
-                self.save_last_path(p)
-                self.clear_workspace()
-                df_k = analyze_raw_data(fc, fs)
-                df_s = pd.read_csv(self.server_sklad, encoding='cp1250')
-                self.current_module = KabelovyEditor(self.workspace, df_k, df_s, p, self.log, self.server_sklad)
+        fc = self._ask_open_files("LINES (EPLAN čáry)")
+        if not fc: return
+        fs = self._ask_open_files("SIGNALS (EPLAN signály)")
+        if not fs: return
+        p = self._ask_save_file("ULOŽIT PROJEKT JAKO")
+        if not p: return
+
+        self.save_last_path(p)
+        self.show_busy("Zpracovávám EPLAN soubory…")
+        try:
+            df_k = analyze_raw_data(fc, fs)
+            df_s = pd.read_csv(self.server_sklad, encoding='cp1250')
+        except Exception as e:
+            self.log(f"CHYBA při importu EPLAN: {e}")
+            self.show_error_screen(f"Import EPLAN selhal:\n{e}")
+            return
+        if df_k.empty:
+            self.log("VAROVÁNÍ: import nevytvořil žádné řádky.")
+            self.show_error_screen("Import nevytvořil žádná data.\n"
+                                   "Zkontroluj, že jde o správné EPLAN CSV (oddělovač ';').")
+            return
+
+        self.clear_workspace()
+        self.current_module = KabelovyEditor(self.workspace, df_k, df_s, p, self.log, self.server_sklad)
+        self.log(f"Nový projekt vytvořen ({len(df_k)} řádků): {p}")
 
     def action_open_project(self):
         if not self.ensure_sklad_path(): return
-        f = filedialog.askopenfilename(filetypes=[("CSV", "*.csv")], initialdir=self.get_initial_dir())
-        if f:
-            self.save_last_path(f)
-            self.clear_workspace()
+        f = self._ask_open_file("OTEVŘÍT PROJEKT")
+        if not f: return
+
+        self.save_last_path(f)
+        self.show_busy("Načítám projekt…")
+        try:
             df_k = pd.read_csv(f, encoding='cp1250')
             df_s = pd.read_csv(self.server_sklad, encoding='cp1250')
-            self.current_module = KabelovyEditor(self.workspace, df_k, df_s, f, self.log, self.server_sklad)
+        except Exception as e:
+            self.log(f"CHYBA při otevírání projektu: {e}")
+            self.show_error_screen(f"Otevření projektu selhalo:\n{e}")
+            return
+
+        self.clear_workspace()
+        self.current_module = KabelovyEditor(self.workspace, df_k, df_s, f, self.log, self.server_sklad)
+        self.log(f"Projekt otevřen ({len(df_k)} řádků): {f}")
 
     def action_save(self):
         if self.current_module: self.current_module.save_project()
