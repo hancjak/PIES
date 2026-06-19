@@ -32,7 +32,8 @@ Name: "czech"; MessagesFile: "compiler:Languages\Czech.isl"
 Name: "desktopicon"; Description: "Vytvořit zástupce na ploše"; GroupDescription: "Zástupci:"
 
 [Files]
-Source: "..\dist\PIES_System.exe"; DestDir: "{app}"; Flags: ignoreversion
+; onedir build: nakopíruje celou složku (exe + python313.dll + _internal závislosti)
+Source: "..\dist\PIES_System\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{userprograms}\PIES"; Filename: "{app}\{#MyAppExeName}"
